@@ -25,6 +25,13 @@
                     Click="btnIniciarAutomacao_Click" Margin="10,8,0,0" IsEnabled="False"
                     HorizontalAlignment="Left" Width="220"/>
 
+            <!-- Caixa de texto (só leitura) pra mostrar o resumo de dose no final.
+                 Mais simples de explicar pros alunos do que uma ListBox, porque
+                 é só "texto que aparece aqui", sem precisar entender coleção de itens. -->
+            <TextBox x:Name="txtResultados" Margin="10,8,10,10" Height="140"
+                     IsReadOnly="True" FontFamily="Consolas" FontSize="11"
+                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+
         </StackPanel>
     </Grid>
 </Window>
