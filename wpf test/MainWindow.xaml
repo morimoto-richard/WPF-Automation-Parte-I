@@ -13,9 +13,14 @@
 
             <StackPanel Orientation="Horizontal" Margin="10,10,0,4">
                 <TextBlock Text="ID do paciente:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <TextBox x:Name="txtBuscaId" Width="200"/>
+                <TextBox x:Name="txtBuscaId" Width="200" TextChanged="txtBuscaId_TextChanged"/>
                 <Button x:Name="btnAbrirPaciente" Content="Abrir paciente" Click="btnAbrirPaciente_Click" Margin="20,0,8,0"/>
             </StackPanel>
+
+            <!-- Sugestões: some enquanto a caixa está vazia, some de novo quando
+                 você clica numa sugestão (preenche o ID e volta a ficar oculta). -->
+            <ListBox x:Name="lstSugestoes" Height="100" Margin="10,0,10,0"
+                     SelectionChanged="lstSugestoes_SelectionChanged"/>
 
             <!-- Mensagens de status ficam AQUI, separadas do campo de digitação -->
             <TextBlock x:Name="lblStatus" Margin="10,8,0,0" FontStyle="Italic" Foreground="Gray"/>

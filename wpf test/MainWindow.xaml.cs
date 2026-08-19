@@ -2,28 +2,20 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+using System.Windows.Controls; // TextChangedEventArgs / SelectionChangedEventArgs (eventos da caixa de busca e da lista de sugestoes)
 using Application = VMS.TPS.Common.Model.API.Application;   // apelido: evita ambiguidade com System.Windows.Application
 using Patient = VMS.TPS.Common.Model.API.Patient;
 using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
 
-[assembly:ESAPIScript(IsWriteable = true)]  // permite escrever no banco do Aria (criar plano, otimizar, calcular dose)
+[assembly:ESAPIScript(IsWriteable = true)] // permite escrever no banco do Aria
 
 namespace wpftest
 {
     public partial class MainWindow : Window
     {
-        // --- As 3 linhas que o script original pede pra colar logo após a
-        // classe: isso "importa" a função AllocConsole do Windows
-        // (kernel32.dll), que abre uma janela de console preta pra gente
-        // usar Console/Trace e acompanhar a automação passo a passo. ---
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        static extern bool AllocConsole();
-
         // Objeto principal do ESAPI — so pode existir 1 por execucao do programa.
         private Application app;
 
@@ -32,6 +24,14 @@ namespace wpftest
         // outro botao. Comeca null ate algum paciente ser aberto com sucesso.
         private Patient pacienteAtual;
 
+        // Lista de TODOS os pacientes, carregada 1 UNICA VEZ quando o programa
+        // abre. Diferente do banco SQL do AriaQ (que fica na rede - por isso
+        // la usamos timer de espera + busca assincrona), essa lista fica
+        // pronta na memoria do programa. Filtrar uma lista que ja esta na
+        // memoria e muito rapido, entao da pra fazer isso a cada tecla
+        // digitada sem se preocupar com performance nem usar threads.
+        private List<PatientSummary> todosOsPacientes;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -39,6 +39,7 @@ namespace wpftest
             try
             {
                 app = Application.CreateApplication();
+                todosOsPacientes = app.PatientSummaries.ToList();
             }
             catch (Exception ex)
             {
@@ -49,6 +50,38 @@ namespace wpftest
 
             // Precisa liberar (Dispose) a Application quando a janela fecha.
             Closing += (s, e) => app.Dispose();
+        }
+
+        // Dispara a CADA tecla digitada na caixa de ID. So filtra a lista que
+        // ja esta na memoria (todosOsPacientes) - por isso pode rodar direto
+        // aqui, sem timer de espera nem thread separada.
+        private void txtBuscaId_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            string termo = txtBuscaId.Text.Trim();
+            lstSugestoes.Items.Clear();
+
+            if (termo.Length == 0 || todosOsPacientes == null) return;
+
+            var resultados = todosOsPacientes
+                .Where(p => p.Id != null && p.Id.StartsWith(termo, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(p => p.Id)
+                .Take(15) // limita a lista pra nao ficar gigante na tela
+                .ToList();
+
+            foreach (var p in resultados)
+                lstSugestoes.Items.Add(p.Id + " - " + p.LastName + ", " + p.FirstName);
+        }
+
+        // Ao clicar numa sugestao, so preenche o campo de ID - o fluxo de
+        // abrir o paciente continua sendo o mesmo botao "Abrir paciente" de
+        // sempre, isso so ajuda a achar o ID certo mais rapido.
+        private void lstSugestoes_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (lstSugestoes.SelectedItem == null) return;
+
+            string selecionado = lstSugestoes.SelectedItem.ToString();
+            txtBuscaId.Text = selecionado.Split('-')[0].Trim(); // pega so o ID, antes do " - "
+            lstSugestoes.Items.Clear();
         }
 
         private void btnAbrirPaciente_Click(object sender, RoutedEventArgs e)
@@ -121,19 +154,13 @@ namespace wpftest
                 return;
             }
 
-            // Abre a janela de console preta.
-            AllocConsole();
-
-            // Precisa "religar" a saída padrão do .NET pra essa janela nova
-            // que acabou de ser criada — sem isso, o Console.Out continua
-            // desconectado (é por isso que a janela ficava preta, sem nada
-            // escrito, mesmo o Trace funcionando no Output do Visual Studio).
-            var saidaConsole = new System.IO.StreamWriter(Console.OpenStandardOutput());
-            saidaConsole.AutoFlush = true;
-            Console.SetOut(saidaConsole);
-
-            Trace.Listeners.Add(new ConsoleTraceListener());
-            Trace.WriteLine("Iniciando a automação.\n");
+            // Log de acompanhamento: aparece na janela "Output" do Visual
+            // Studio enquanto você roda com F5 (Debug > janelas > Output,
+            // ou já vem aberta por padrão). Tiramos o console preto
+            // (AllocConsole) porque ele tinha um problema chato de
+            // compatibilidade com o debugger do Visual Studio — o Trace já
+            // resolve sem precisar de janela extra nenhuma.
+            Trace.WriteLine("Iniciando a automacao.\n");
 
             try
             {
@@ -180,11 +207,11 @@ namespace wpftest
                 {
                     currentStructureSet = origem.Copy();
                     currentStructureSet.Id = "HalcyonStructSet";
-                    Trace.WriteLine("HalcyonStructSet criado a partir de um StructureSet não aprovado.\n");
+                    Trace.WriteLine("HalcyonStructSet criado a partir de um StructureSet nao aprovado.\n");
                 }
                 else
                 {
-                    Trace.WriteLine("Nenhum StructureSet não aprovado encontrado. Crie um e tente de novo.\n");
+                    Trace.WriteLine("Nenhum StructureSet nao aprovado encontrado. Crie um e tente de novo.\n");
                     app.SaveModifications();
                     return;
                 }
@@ -197,7 +224,7 @@ namespace wpftest
 
                 if (structurePTV == null)
                 {
-                    Trace.WriteLine("A estrutura PTV não existe.\n");
+                    Trace.WriteLine("A estrutura PTV nao existe.\n");
                     return;
                 }
                 structurePTV.Id = "HalcyonPTV";
@@ -226,7 +253,7 @@ namespace wpftest
                 if (halcyonRefPoint == null)
                 {
                     halcyonRefPoint = pacienteAtual.AddReferencePoint(true, "HalcyonRefPoint");
-                    Trace.WriteLine("Ponto de referência criado.\n");
+                    Trace.WriteLine("Ponto de referencia criado.\n");
                 }
 
                 // ---- Plano ----
@@ -238,17 +265,17 @@ namespace wpftest
                 int numeroFracoes = 5;
                 double doseTotalCgy = 3625;
                 halcyonExternalPlan.SetPrescription(numeroFracoes, new DoseValue(doseTotalCgy / numeroFracoes, "cGy"), 1);
-                Trace.WriteLine("Prescrição definida: " + numeroFracoes + " frações, " + doseTotalCgy + " cGy total.\n");
+                Trace.WriteLine("Prescricao definida: " + numeroFracoes + " fracoes, " + doseTotalCgy + " cGy total.\n");
 
                 // ---- Estruturas de risco ----
                 // Exemplo pensado pra um caso de próstata — se o paciente de
                 // teste não tiver Reto/Bexiga, a automação para aqui de
                 // propósito, pra não seguir com dados incompletos.
                 Structure structureRectum = currentStructureSet.Structures.FirstOrDefault(s => s.Id.Equals("Rectum"));
-                if (structureRectum == null) { Trace.WriteLine("Estrutura Rectum não encontrada.\n"); return; }
+                if (structureRectum == null) { Trace.WriteLine("Estrutura Rectum nao encontrada.\n"); return; }
 
                 Structure structureBladder = currentStructureSet.Structures.FirstOrDefault(s => s.Id.Equals("Bladder"));
-                if (structureBladder == null) { Trace.WriteLine("Estrutura Bladder não encontrada.\n"); return; }
+                if (structureBladder == null) { Trace.WriteLine("Estrutura Bladder nao encontrada.\n"); return; }
 
                 // ---- Objetivos de otimização ----
                 // Calculados a partir da dose prescrita (ex.: hot spot =
@@ -280,7 +307,7 @@ namespace wpftest
                     structureBladder, OptimizationObjectiveOperator.Upper, new DoseValue(bexigaObjetivo90p, "cGy"), 90, 65);
 
                 halcyonExternalPlan.OptimizationSetup.AddAutomaticNormalTissueObjective(50);
-                Trace.WriteLine("Objetivos de otimização adicionados.\n");
+                Trace.WriteLine("Objetivos de otimizacao adicionados.\n");
 
                 // ---- Campos de tratamento (2 arcos) ----
                 ExternalBeamMachineParameters beamMachineParameters =
@@ -325,8 +352,23 @@ namespace wpftest
 
                 // ---- Otimização e cálculo de dose (as duas linhas mais demoradas) ----
                 Trace.WriteLine("Otimizando (pode demorar alguns minutos)...\n");
-                halcyonExternalPlan.OptimizeVMAT(new OptimizationOptionsVMAT(1, string.Empty));
-                Trace.WriteLine("Otimização concluída.\n");
+                OptimizerResult resultadoOtimizacao = halcyonExternalPlan.OptimizeVMAT(new OptimizationOptionsVMAT(1, string.Empty));
+
+                // NOVO: antes a automação seguia direto pro cálculo de dose mesmo
+                // que a otimização tivesse falhado - por isso aparecia o erro
+                // "MLC required in Field ...": sem uma otimização bem-sucedida,
+                // os campos não têm abertura de MLC válida pra calcular dose em
+                // cima. Agora a gente checa "Success" e para aqui se falhar, em
+                // vez de continuar com um plano incompleto.
+                if (!resultadoOtimizacao.Success)
+                {
+                    Trace.WriteLine("Otimizacao FALHOU - automacao interrompida antes do calculo de dose.\n");
+                    lblStatus.Text = "Otimização falhou. Verifique os parâmetros do plano/campos antes de tentar de novo.";
+                    app.SaveModifications();
+                    return; // o "finally" ainda roda (fecha o paciente, trava o botão)
+                }
+
+                Trace.WriteLine("Otimizacao concluida.\n");
                 app.SaveModifications();
 
                 Trace.WriteLine("Calculando a dose...\n");
@@ -350,7 +392,7 @@ namespace wpftest
                 DoseValue normalizacao = halcyonExternalPlan.GetDoseAtVolume(
                     structurePTV, 95, VolumePresentation.Relative, DoseValuePresentation.Relative);
                 halcyonExternalPlan.PlanNormalizationValue = normalizacao.Dose;
-                Trace.WriteLine("Normalização definida: " + normalizacao.Dose + "%\n");
+                Trace.WriteLine("Normalizacao definida: " + normalizacao.Dose + "%\n");
 
                 // ---- Resumo dos resultados dosimétricos ----
                 // Isolado num método próprio (MontarResumoDosimetrico) só
@@ -362,12 +404,12 @@ namespace wpftest
                     bexigaObjetivo1cc, bexigaObjetivo90p);
 
                 app.SaveModifications();
-                Trace.WriteLine("Automação concluída.\n");
+                Trace.WriteLine("Automacao concluida.\n");
                 lblStatus.Text = "Automação concluída para o paciente " + pacienteAtual.Id + ".";
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("Erro durante a automação: " + ex.Message + "\n");
+                Trace.WriteLine("Erro durante a automacao: " + ex.Message + "\n");
                 lblStatus.Text = "Erro durante a automação: " + ex.Message;
             }
             finally
