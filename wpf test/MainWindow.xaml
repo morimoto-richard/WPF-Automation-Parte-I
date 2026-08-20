@@ -13,14 +13,9 @@
 
             <StackPanel Orientation="Horizontal" Margin="10,10,0,4">
                 <TextBlock Text="ID do paciente:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <TextBox x:Name="txtBuscaId" Width="200" TextChanged="txtBuscaId_TextChanged"/>
+                <TextBox x:Name="txtBuscaId" Width="200"/>
                 <Button x:Name="btnAbrirPaciente" Content="Abrir paciente" Click="btnAbrirPaciente_Click" Margin="20,0,8,0"/>
             </StackPanel>
-
-            <!-- Sugestões: some enquanto a caixa está vazia, some de novo quando
-                 você clica numa sugestão (preenche o ID e volta a ficar oculta). -->
-            <ListBox x:Name="lstSugestoes" Height="100" Margin="10,0,10,0"
-                     SelectionChanged="lstSugestoes_SelectionChanged"/>
 
             <!-- Mensagens de status ficam AQUI, separadas do campo de digitação -->
             <TextBlock x:Name="lblStatus" Margin="10,8,0,0" FontStyle="Italic" Foreground="Gray"/>
@@ -31,8 +26,7 @@
                     HorizontalAlignment="Left" Width="220"/>
 
             <!-- Caixa de texto (só leitura) pra mostrar o resumo de dose no final.
-                 Mais simples de explicar pros alunos do que uma ListBox, porque
-                 é só "texto que aparece aqui", sem precisar entender coleção de itens. -->
+                  -->
             <TextBox x:Name="txtResultados" Margin="10,8,10,10" Height="140"
                      IsReadOnly="True" FontFamily="Consolas" FontSize="11"
                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
